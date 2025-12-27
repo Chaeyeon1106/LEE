@@ -20,7 +20,7 @@ from collections import Counter
 # --- 1. 페이지 및 폰트 설정 ---
 st.set_page_config(page_title="네이버 블로그 AI 분석기", layout="wide")
 
-# 한글 폰트 설정 (Windows 환경 기준, 리눅스 서버 배포 시 별도 설정 필요)
+# 한글 폰트 설정 (Windows/서버 공용 대비)
 plt.rcParams['font.family'] = 'Malgun Gothic'
 plt.rcParams['axes.unicode_minus'] = False
 
@@ -40,12 +40,11 @@ def enter_frame(driver):
         return False
 
 # --- 3. 웹 화면 UI ---
-st.title("🤖 이채연의 네이버 블로그 AI 분석기")
+st.title("🤖 네이버 블로그 AI 분석기")
 st.write("아이디를 입력하면 모든 포스트를 긁어와 AI가 페르소나 리포트를 작성합니다.")
 
 with st.sidebar:
     st.header("⚙️ 설정")
-    # 예시 블로그 아이디 변경
     target_id = st.text_input("네이버 블로그 ID", placeholder="예: chaeyeonlee_1106")
     analyze_btn = st.button("전체 게시글 분석 시작 🚀")
     st.info("글 개수가 많으면 링크 수집 및 분석에 시간이 다소 소요됩니다.")
@@ -55,13 +54,24 @@ if analyze_btn and target_id:
     status_text = st.empty()
     
     try:
-        # 크롬 드라이버 설정
+        # [수정 포인트] 크롬 드라이버 서버 환경 최적화 설정
         chrome_options = Options()
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        # Streamlit Cloud 리눅스 서버용 크롬 실행 파일 경로 명시
+        chrome_options.binary_location = "/usr/bin/chromium" 
+
+        status_text.text("🔍 서버 브라우저 엔진 설정 중...")
         
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        # 서버 환경 전용 서비스 설정 (packages.txt를 통해 설치된 드라이버 경로)
+        try:
+            service = Service("/usr/bin/chromedriver")
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        except:
+            # 위 경로가 실패할 경우 webdriver_manager를 통해 재시도
+            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         
         # [1단계] 모든 페이지 링크 수집
         driver.get(f"https://blog.naver.com/{target_id}")
@@ -72,7 +82,6 @@ if analyze_btn and target_id:
         status_text.text("🔗 모든 게시글 링크를 확보하는 중입니다...")
         while True:
             enter_frame(driver)
-            # 목록 열기 체크 (닫혀있으면 열기)
             try:
                 open_btn = WebDriverWait(driver, 3).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "a.btn_openlist, #toplistBtn"))
@@ -83,7 +92,6 @@ if analyze_btn and target_id:
             except:
                 pass
 
-            # 현재 페이지 링크 추출
             links = driver.find_elements(By.CSS_SELECTOR, "a._setTopListUrl")
             for link in links:
                 raw_url = link.get_attribute('href')
@@ -95,7 +103,6 @@ if analyze_btn and target_id:
             
             status_text.text(f"🔗 링크 수집 중: {current_page}페이지 완료 (누적 {len(all_post_links)}개)")
             
-            # 다음 페이지 이동 로직
             next_p = current_page + 1
             try:
                 page_btn = driver.find_element(By.LINK_TEXT, str(next_p))
@@ -109,7 +116,7 @@ if analyze_btn and target_id:
                     time.sleep(1)
                     current_page = next_p
                 except:
-                    break # 더 이상 페이지 없음
+                    break 
 
         # [2단계] 확보된 모든 링크 정밀 분석
         data = []
@@ -126,7 +133,6 @@ if analyze_btn and target_id:
             enter_frame(driver)
             
             try:
-                # 날짜 데이터
                 date_text = ""
                 for s in ["span.se_publishDate.pcol2", "span.se_publishDate", ".date"]:
                     try:
@@ -134,7 +140,6 @@ if analyze_btn and target_id:
                         if date_text: break
                     except: continue
 
-                # 제목, 본문, 이미지 추출
                 title = WebDriverWait(driver, 5).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, ".se-title-text, .pcol1, .itemSubjectBoldfont"))
                 ).text.strip()
@@ -143,7 +148,6 @@ if analyze_btn and target_id:
                 content = content_el.text.strip()
                 img_count = len(content_el.find_elements(By.TAG_NAME, "img"))
                 
-                # 좋아요/댓글 추출 (스크롤)
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(0.2)
                 l_count = 0
@@ -168,7 +172,6 @@ if analyze_btn and target_id:
         if data:
             df = pd.DataFrame(data)
             
-            # 시간/계절 데이터 파싱
             def parse_dt(text):
                 nums = re.findall(r'\d+', str(text))
                 return nums if len(nums) >= 5 else None
@@ -186,7 +189,6 @@ if analyze_btn and target_id:
 
             status_text.text("🤖 AI가 페르소나 리포트를 최종 생성하고 있습니다...")
             
-            # AI 분석 (최신 글 제목 30개 기준)
             titles_summary = "\n".join(df['제목'].tolist()[:30])
             prompt = f"다음 블로그 제목들을 보고 주제, 페르소나 분석, 3줄 요약을 한국어로 작성해줘:\n{titles_summary}"
             ai_res = ai_model.generate_content(prompt).text
@@ -223,7 +225,6 @@ if analyze_btn and target_id:
             st.subheader("8️⃣ [🤖 AI 심층 페르소나 리포트]")
             st.info(ai_res)
             
-            # 하단 차트 (비중)
             st.subheader("📷 글/사진 구성 비중")
             fig_pie, ax_pie = plt.subplots()
             ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()*100], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
@@ -231,7 +232,6 @@ if analyze_btn and target_id:
 
     except Exception as e:
         st.error(f"⚠️ 분석 중 오류 발생: {e}")
-        # driver.quit()을 삭제하여 세션을 유지하거나 에러 로그만 출력
     
 else:
     if analyze_btn and not target_id:
