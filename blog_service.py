@@ -20,9 +20,22 @@ from collections import Counter
 # --- 1. 페이지 및 폰트 설정 ---
 st.set_page_config(page_title="이채연의 네이버 블로그 AI 분석기", layout="wide")
 
-# 한글 폰트 설정 (Windows/서버 공용 대비)
-plt.rcParams['font.family'] = 'Malgun Gothic'
-plt.rcParams['axes.unicode_minus'] = False
+# [수정] 서버 환경 한글 깨짐 방지 설정
+def set_korean_font():
+    try:
+        # 시스템에 설치된 폰트 확인
+        font_names = [f.name for f in fm.fontManager.ttflist]
+        if 'NanumGothic' in font_names:
+            plt.rcParams['font.family'] = 'NanumGothic'
+        elif 'Malgun Gothic' in font_names:
+            plt.rcParams['font.family'] = 'Malgun Gothic'
+        else:
+            plt.rcParams['font.family'] = 'DejaVu Sans'
+        plt.rcParams['axes.unicode_minus'] = False
+    except:
+        pass
+
+set_korean_font()
 
 # --- 2. AI 모델 설정 ---
 GEMINI_API_KEY = "AIzaSyBcdRHL1ZxKofBrzCGgHJ9FH4p5rtc9UyY"
@@ -236,4 +249,5 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
+
 
