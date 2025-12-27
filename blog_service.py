@@ -18,7 +18,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from collections import Counter
 
 # --- 1. 페이지 및 폰트 설정 ---
-st.set_page_config(page_title="네이버 블로그 AI 분석기", layout="wide")
+st.set_page_config(page_title="이채연의 네이버 블로그 AI 분석기", layout="wide")
 
 # 한글 폰트 설정 (Windows/서버 공용 대비)
 plt.rcParams['font.family'] = 'Malgun Gothic'
@@ -40,14 +40,14 @@ def enter_frame(driver):
         return False
 
 # --- 3. 웹 화면 UI ---
-st.title("🤖 네이버 블로그 AI 분석기")
-st.write("아이디를 입력하면 모든 포스트를 긁어와 AI가 페르소나 리포트를 작성합니다.")
+st.title("이채연의 네이버 블로그 AI 분석기🤖")
+st.write("아이디를 입력하면 당신의 블로그를 모두 긁어와 AI가 리포트를 작성합니다.")
 
 with st.sidebar:
     st.header("⚙️ 설정")
     target_id = st.text_input("네이버 블로그 ID", placeholder="예: chaeyeonlee_1106")
     analyze_btn = st.button("전체 게시글 분석 시작 🚀")
-    st.info("글 개수가 많으면 링크 수집 및 분석에 시간이 다소 소요됩니다.")
+    st.info("글 개수가 많으면 분석에 시간이 다소 소요됩니다.")
 
 if analyze_btn and target_id:
     progress_bar = st.progress(0)
@@ -203,12 +203,12 @@ if analyze_btn and target_id:
                 st.write(f"1️⃣ 총 게시물 수: **{len(df)}개**")
                 st.write(f"2️⃣ 가장 활발한 계절: **{df['계절'].mode()[0]}**")
                 st.write(f"3️⃣ 주요 활동 시간대: **{df['hour'].mode()[0]}시**")
-                st.write(f"4️⃣ 콘텐츠 총량: **✍️{df['글자수'].sum():,}자 / 📷{df['이미지수'].sum()}장**")
+                st.write(f"4️⃣ 콘텐츠 구성: **✍️{df['글자수'].sum():,}자 / 📷{df['이미지수'].sum()}장**")
                 
                 best_l = df.loc[df['좋아요'].idxmax()]
                 best_c = df.loc[df['댓글'].idxmax()]
-                st.info(f"5️⃣ 좋아요 최고 인기글: \n**{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
-                st.success(f"6️⃣ 댓글 소통왕 게시글: \n**{best_c['제목']}** (💬 {best_c['댓글']}개)")
+                st.info(f"5️⃣ 공감 최다 게시물: \n**{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
+                st.success(f"6️⃣ 댓글 최다 게시물: \n**{best_c['제목']}** (💬 {best_c['댓글']}개)")
 
             with col2:
                 st.subheader("7️⃣ 최다 사용 단어 TOP 5")
@@ -222,7 +222,7 @@ if analyze_btn and target_id:
                 st.pyplot(fig_bar)
 
             st.divider()
-            st.subheader("8️⃣ [🤖 AI 심층 페르소나 리포트]")
+            st.subheader("8️⃣ [🤖 AI 심층 리포트]")
             st.info(ai_res)
             
             st.subheader("📷 글/사진 구성 비중")
@@ -236,3 +236,4 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
+
