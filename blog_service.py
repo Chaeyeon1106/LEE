@@ -1,13 +1,13 @@
 #pip install selenium pandas matplotlib google-generativeai webdriver-manager openpyxl
 #pip install streamlit
 #파일 탐색기에 해당 폴더를 오른쪽 클릭 '통합 터미널에서 열기'->터미널에서 streamlit run blog_service.py
-
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import matplotlib.pyplot as plt
 import re
 import time
+import matplotlib.font_manager as fm  # [수정] 폰트 관리를 위해 반드시 필요
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -20,20 +20,29 @@ from collections import Counter
 # --- 1. 페이지 및 폰트 설정 ---
 st.set_page_config(page_title="이채연의 네이버 블로그 AI 분석기", layout="wide")
 
-# [수정] 서버 환경 한글 깨짐 방지 설정
+# [수정] 서버(리눅스)와 로컬(윈도우) 환경 모두에서 한글이 안 깨지도록 하는 설정
 def set_korean_font():
     try:
-        # 시스템에 설치된 폰트 확인
+        # 리눅스 서버에 설치될 나눔고딕 경로
+        nanum_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+        
+        # 1. 먼저 시스템에 나눔폰트가 있는지 확인
         font_names = [f.name for f in fm.fontManager.ttflist]
+        
         if 'NanumGothic' in font_names:
             plt.rcParams['font.family'] = 'NanumGothic'
         elif 'Malgun Gothic' in font_names:
             plt.rcParams['font.family'] = 'Malgun Gothic'
         else:
-            plt.rcParams['font.family'] = 'DejaVu Sans'
+            # 2. 이름으로 못 찾으면 파일 경로로 직접 등록 (가장 확실함)
+            fe = fm.FontEntry(fname=nanum_path, name='NanumGothic')
+            fm.fontManager.ttflist.insert(0, fe)
+            plt.rcParams['font.family'] = fe.name
+            
         plt.rcParams['axes.unicode_minus'] = False
     except:
-        pass
+        # 모든 시도가 실패할 경우 기본 폰트 사용
+        plt.rcParams['font.family'] = 'DejaVu Sans'
 
 set_korean_font()
 
@@ -67,26 +76,21 @@ if analyze_btn and target_id:
     status_text = st.empty()
     
     try:
-        # [수정 포인트] 크롬 드라이버 서버 환경 최적화 설정
         chrome_options = Options()
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        # Streamlit Cloud 리눅스 서버용 크롬 실행 파일 경로 명시
         chrome_options.binary_location = "/usr/bin/chromium" 
 
         status_text.text("🔍 서버 브라우저 엔진 설정 중...")
         
-        # 서버 환경 전용 서비스 설정 (packages.txt를 통해 설치된 드라이버 경로)
         try:
             service = Service("/usr/bin/chromedriver")
             driver = webdriver.Chrome(service=service, options=chrome_options)
         except:
-            # 위 경로가 실패할 경우 webdriver_manager를 통해 재시도
             driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         
-        # [1단계] 모든 페이지 링크 수집
         driver.get(f"https://blog.naver.com/{target_id}")
         time.sleep(2)
         all_post_links = []
@@ -131,7 +135,6 @@ if analyze_btn and target_id:
                 except:
                     break 
 
-        # [2단계] 확보된 모든 링크 정밀 분석
         data = []
         total_links = len(all_post_links)
         
@@ -181,7 +184,6 @@ if analyze_btn and target_id:
             
             progress_bar.progress(int((i + 1) / total_links * 100))
 
-        # [3단계] 결과 분석 및 리포트 출력
         if data:
             df = pd.DataFrame(data)
             
@@ -220,8 +222,10 @@ if analyze_btn and target_id:
                 
                 best_l = df.loc[df['좋아요'].idxmax()]
                 best_c = df.loc[df['댓글'].idxmax()]
-                st.info(f"5️⃣ 공감 최다 게시물: \n**{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
-                st.success(f"6️⃣ 댓글 최다 게시물: \n**{best_c['제목']}** (💬 {best_c['댓글']}개)")
+                
+                # [수정] 더 가시성 있는 문구로 변경
+                st.info(f"5️⃣ **🏆 명예의 전당: 가장 뜨거웠던 포스트** \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
+                st.success(f"6️⃣ **💬 소통왕: 댓글 반응이 가장 좋았던 글** \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
 
             with col2:
                 st.subheader("7️⃣ 최다 사용 단어 TOP 5")
@@ -249,5 +253,6 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
+
 
 
