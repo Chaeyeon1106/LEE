@@ -214,7 +214,7 @@ if analyze_btn and target_id:
                 f"다음 블로그 제목들을 분석해줘:\n{titles_summary}\n\n"
                 "분석 결과는 아래 형식으로만 작성해줘:\n"
                 "1. 글 분석: 작성자의 이름, 현재 상태(예: 휴학생), 성격적 특징을 포함하여 설명해줘.\n"
-                "2. 3줄 요약: 블로그의 핵심 내용과 분위기를 3문장으로 정리해줘.\n"
+                "2. 3줄 요약: 블로그의 핵심 내용과 톤앤매너를 3문장으로 정리해줘.\n"
                 "(주의: '주제 분석', '목표', '특징' 섹션은 제외해줘. HTML 태그인 <br>은 절대 쓰지 말고 줄바꿈으로만 구분해줘.)"
             )
             ai_res = ai_model.generate_content(prompt).text
@@ -265,6 +265,7 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
+
 
 
 
