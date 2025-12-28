@@ -9,7 +9,7 @@ import google.generativeai as genai
 import matplotlib.pyplot as plt
 import re
 import time
-import matplotlib.font_manager as fm  # [수정] 폰트 관리를 위해 반드시 필요
+import matplotlib.font_manager as fm 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -22,40 +22,37 @@ from collections import Counter
 # --- 1. 페이지 및 폰트 설정 ---
 st.set_page_config(page_title="이채연의 네이버 블로그 AI 분석기", layout="wide")
 
-# [수정] 서버(리눅스)와 로컬(윈도우) 환경 모두에서 한글이 안 깨지도록 하는 설정
 def set_korean_font():
     try:
-        # 리눅스 서버에 설치될 나눔고딕 경로
         nanum_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
-        
-        # 1. 먼저 시스템에 나눔폰트가 있는지 확인
         font_names = [f.name for f in fm.fontManager.ttflist]
-        
         if 'NanumGothic' in font_names:
             plt.rcParams['font.family'] = 'NanumGothic'
         elif 'Malgun Gothic' in font_names:
             plt.rcParams['font.family'] = 'Malgun Gothic'
         else:
-            # 2. 이름으로 못 찾으면 파일 경로로 직접 등록 (가장 확실함)
             fe = fm.FontEntry(fname=nanum_path, name='NanumGothic')
             fm.fontManager.ttflist.insert(0, fe)
             plt.rcParams['font.family'] = fe.name
-            
         plt.rcParams['axes.unicode_minus'] = False
     except:
-        # 모든 시도가 실패할 경우 기본 폰트 사용
         plt.rcParams['font.family'] = 'DejaVu Sans'
 
 set_korean_font()
 
-# --- 2. AI 모델 설정 ---
-# [수정] 직접 키를 적지 않고 Streamlit Secrets에서 안전하게 가져옵니다.
+# --- 2. AI 모델 설정 (보안 적용 완료) ---
+# [중요 수정] st.secrets 안에는 키 값이 아니라 '이름'인 "GEMINI_API_KEY"가 들어가야 합니다.
 try:
-    GEMINI_API_KEY = st.secrets["AIzaSyBPIVefQONoPg1bIWxBjP97b3OBhRnsYho"]
-    genai.configure(api_key=GEMINI_API_KEY)
-except:
-    st.error("API 키가 설정되지 않았습니다. Secrets 설정을 확인해주세요.")
-ai_model = genai.GenerativeModel('models/gemini-flash-latest')
+    if "GEMINI_API_KEY" in st.secrets:
+        GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+        genai.configure(api_key=GEMINI_API_KEY)
+        ai_model = genai.GenerativeModel('models/gemini-flash-latest')
+    else:
+        st.error("API 키가 Secrets에 설정되지 않았습니다.")
+        st.stop()
+except Exception as e:
+    st.error(f"API 설정 중 오류: {e}")
+    st.stop()
 
 def enter_frame(driver):
     driver.switch_to.default_content()
@@ -229,7 +226,6 @@ if analyze_btn and target_id:
                 best_l = df.loc[df['좋아요'].idxmax()]
                 best_c = df.loc[df['댓글'].idxmax()]
                 
-                # [수정] 더 가시성 있는 문구로 변경
                 st.info(f"5️⃣ **🏆 명예의 전당: 가장 뜨거웠던 포스트** \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
                 st.success(f"6️⃣ **💬 소통왕: 댓글 반응이 가장 좋았던 글** \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
 
