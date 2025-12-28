@@ -1,7 +1,9 @@
 #pip install selenium pandas matplotlib google-generativeai webdriver-manager openpyxl
 #pip install streamlit
 #파일 탐색기에 해당 폴더를 오른쪽 클릭 '통합 터미널에서 열기'->터미널에서 streamlit run blog_service.py
-#API키: AIzaSyBPIVefQONoPg1bIWxBjP97b3OBhRnsYho
+#https://nblog-analyzer-by-chaeyeon.streamlit.app/
+#Streamlit Cloud 대시보드 -> Settings -> Secrets 메뉴에 아래 내용을 정확히 입력하고 저장(Save)
+# GEMINI_API_KEY = "AIzaSyBPIVefQONoPg1bIWxBjP97b3OBhRnsYho"
 
 import streamlit as st
 import pandas as pd
@@ -256,6 +258,7 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
+
 
 
 
