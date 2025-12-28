@@ -242,7 +242,8 @@ if analyze_btn and target_id:
 
             st.divider()
             st.subheader("8️⃣ [🤖 AI 심층 리포트]")
-            st.info(ai_res)
+            # <br> 태그를 파이썬이 인식하는 줄바꿈(\n)으로 강제 변환합니다.
+            st.info(ai_res.replace("<br>", "\n").replace("<br/>", "\n"))
             
             st.subheader("📷 글/사진 구성 비중")
             fig_pie, ax_pie = plt.subplots()
@@ -255,6 +256,7 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
+
 
 
 
