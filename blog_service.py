@@ -1,6 +1,8 @@
 #pip install selenium pandas matplotlib google-generativeai webdriver-manager openpyxl
 #pip install streamlit
 #파일 탐색기에 해당 폴더를 오른쪽 클릭 '통합 터미널에서 열기'->터미널에서 streamlit run blog_service.py
+#API키: AIzaSyBPIVefQONoPg1bIWxBjP97b3OBhRnsYho
+
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
@@ -47,8 +49,12 @@ def set_korean_font():
 set_korean_font()
 
 # --- 2. AI 모델 설정 ---
-GEMINI_API_KEY = "AIzaSyBcdRHL1ZxKofBrzCGgHJ9FH4p5rtc9UyY"
-genai.configure(api_key=GEMINI_API_KEY)
+# [수정] 직접 키를 적지 않고 Streamlit Secrets에서 안전하게 가져옵니다.
+try:
+    GEMINI_API_KEY = st.secrets["AIzaSyBPIVefQONoPg1bIWxBjP97b3OBhRnsYho"]
+    genai.configure(api_key=GEMINI_API_KEY)
+except:
+    st.error("API 키가 설정되지 않았습니다. Secrets 설정을 확인해주세요.")
 ai_model = genai.GenerativeModel('models/gemini-flash-latest')
 
 def enter_frame(driver):
@@ -253,6 +259,7 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
+
 
 
 
