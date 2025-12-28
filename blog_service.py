@@ -11,7 +11,7 @@ import google.generativeai as genai
 import matplotlib.pyplot as plt
 import re
 import time
-import matplotlib.font_manager as fm
+import matplotlib.font_manager as fm 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -68,7 +68,7 @@ def enter_frame(driver):
 
 # --- 3. 웹 화면 UI ---
 st.title("이채연의 네이버 블로그 AI 분석기🤖")
-st.write("아이디를 입력하면 당신의 블로그(전체공개)를 기반으로 AI가 리포트를 작성합니다.")
+st.write("아이디를 입력하면 당신의 블로그를 모두 긁어와 AI가 리포트를 작성합니다.")
 
 with st.sidebar:
     st.header("⚙️ 설정")
@@ -79,15 +79,17 @@ with st.sidebar:
 if analyze_btn and target_id:
     progress_bar = st.progress(0)
     status_text = st.empty()
+    
     try:
         chrome_options = Options()
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        chrome_options.binary_location = "/usr/bin/chromium"
+        chrome_options.binary_location = "/usr/bin/chromium" 
 
         status_text.text("🔍 서버 브라우저 엔진 설정 중...")
+        
         try:
             service = Service("/usr/bin/chromedriver")
             driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -98,6 +100,7 @@ if analyze_btn and target_id:
         time.sleep(2)
         all_post_links = []
         current_page = 1
+        
         status_text.text("🔗 모든 게시글 링크를 확보하는 중입니다...")
         while True:
             enter_frame(driver)
@@ -121,6 +124,7 @@ if analyze_btn and target_id:
                         all_post_links.append(clean_url)
             
             status_text.text(f"🔗 링크 수집 중: {current_page}페이지 완료 (누적 {len(all_post_links)}개)")
+            
             next_p = current_page + 1
             try:
                 page_btn = driver.find_element(By.LINK_TEXT, str(next_p))
@@ -134,10 +138,11 @@ if analyze_btn and target_id:
                     time.sleep(1)
                     current_page = next_p
                 except:
-                    break
+                    break 
 
         data = []
         total_links = len(all_post_links)
+        
         if total_links == 0:
             st.error("수집된 게시글이 없습니다. 아이디를 확인해주세요.")
             st.stop()
@@ -147,6 +152,7 @@ if analyze_btn and target_id:
             driver.get(url)
             time.sleep(0.8)
             enter_frame(driver)
+            
             try:
                 date_text = ""
                 for s in ["span.se_publishDate.pcol2", "span.se_publishDate", ".date"]:
@@ -158,9 +164,11 @@ if analyze_btn and target_id:
                 title = WebDriverWait(driver, 5).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, ".se-title-text, .pcol1, .itemSubjectBoldfont"))
                 ).text.strip()
+                
                 content_el = driver.find_element(By.CSS_SELECTOR, ".se-main-container, #postViewArea")
                 content = content_el.text.strip()
                 img_count = len(content_el.find_elements(By.TAG_NAME, "img"))
+                
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(0.2)
                 l_count = 0
@@ -173,15 +181,17 @@ if analyze_btn and target_id:
                 except: pass
 
                 data.append({
-                    "제목": title, "내용": content, "게시일": date_text,
+                    "제목": title, "내용": content, "게시일": date_text, 
                     "좋아요": l_count, "댓글": c_count, "글자수": len(content), "이미지수": img_count
                 })
             except:
                 continue
+            
             progress_bar.progress(int((i + 1) / total_links * 100))
 
         if data:
             df = pd.DataFrame(data)
+            
             def parse_dt(text):
                 nums = re.findall(r'\d+', str(text))
                 return nums if len(nums) >= 5 else None
@@ -189,6 +199,7 @@ if analyze_btn and target_id:
             df = df.dropna(subset=['dt_list'])
             df['hour'] = df['dt_list'].apply(lambda x: int(x[3]))
             df['month'] = df['dt_list'].apply(lambda x: int(x[1]))
+            
             def get_season(m):
                 if m in [3, 4, 5]: return "봄 🌱"
                 elif m in [6, 7, 8]: return "여름 ☀️"
@@ -197,6 +208,7 @@ if analyze_btn and target_id:
             df['계절'] = df['month'].apply(get_season)
 
             status_text.text("🤖 AI가 페르소나 리포트를 최종 생성하고 있습니다...")
+            
             titles_summary = "\n".join(df['제목'].tolist()[:30])
             prompt = f"다음 블로그 제목들을 보고 주제, 페르소나 분석, 3줄 요약을 한국어로 작성해줘:\n{titles_summary}"
             ai_res = ai_model.generate_content(prompt).text
@@ -212,8 +224,10 @@ if analyze_btn and target_id:
                 st.write(f"2️⃣ 가장 활발한 계절: **{df['계절'].mode()[0]}**")
                 st.write(f"3️⃣ 주요 활동 시간대: **{df['hour'].mode()[0]}시**")
                 st.write(f"4️⃣ 콘텐츠 구성: **✍️{df['글자수'].sum():,}자 / 📷{df['이미지수'].sum()}장**")
+                
                 best_l = df.loc[df['좋아요'].idxmax()]
                 best_c = df.loc[df['댓글'].idxmax()]
+                
                 st.info(f"5️⃣ **🏆 명예의 전당: 가장 뜨거웠던 포스트** \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
                 st.success(f"6️⃣ **💬 소통왕: 댓글 반응이 가장 좋았던 글** \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
 
@@ -222,6 +236,7 @@ if analyze_btn and target_id:
                 words = re.findall(r'[가-힣]{2,}', " ".join(df['내용'].tolist()))
                 stop_w = ['진짜', '너무', '오늘', '정말', '생각', '있는', '하고', '것은', '나의', '많이']
                 top_words = Counter([w for w in words if w not in stop_w]).most_common(5)
+                
                 fig_bar, ax_bar = plt.subplots()
                 w_labels, w_counts = zip(*top_words)
                 ax_bar.bar(w_labels, w_counts, color='#A0C4FF')
@@ -229,8 +244,8 @@ if analyze_btn and target_id:
 
             st.divider()
             st.subheader("8️⃣ [🤖 AI 심층 리포트]")
-            # <br> 태그를 파이썬이 인식하는 줄바꿈(\n)으로 강제 변환합니다.
-            st.info(ai_res.replace("<br>", "\n").replace("<br/>", "\n"))
+            st.info(ai_res)
+            
             st.subheader("📷 글/사진 구성 비중")
             fig_pie, ax_pie = plt.subplots()
             ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()*100], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
@@ -238,6 +253,8 @@ if analyze_btn and target_id:
 
     except Exception as e:
         st.error(f"⚠️ 분석 중 오류 발생: {e}")
+    
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
+
