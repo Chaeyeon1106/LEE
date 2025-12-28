@@ -191,6 +191,7 @@ if analyze_btn and target_id:
         if data:
             df = pd.DataFrame(data)
             
+            # 시간 및 계절 데이터 파싱
             def parse_dt(text):
                 nums = re.findall(r'\d+', str(text))
                 return nums if len(nums) >= 5 else None
@@ -210,6 +211,7 @@ if analyze_btn and target_id:
             st.header(f"📊 {target_id} 블로그 최종 분석 리포트")
             st.divider()
 
+            # 지표 섹션
             col1, col2 = st.columns([1, 1.2])
             with col1:
                 st.subheader("📌 핵심 지표")
@@ -220,53 +222,84 @@ if analyze_btn and target_id:
                 
                 best_l = df.loc[df['좋아요'].idxmax()]
                 best_c = df.loc[df['댓글'].idxmax()]
-                
-                st.info(f"5️⃣ **🏆 인기왕: 공감을 가장 많이 받은 포스트** \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
-                st.success(f"6️⃣ **💬 소통왕: 댓글을 가장 많이 받은 포스트** \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
+                st.info(f"5️⃣ **🏆 인기왕:** {best_l['제목']} (❤️ {best_l['좋아요']}개)")
+                st.success(f"6️⃣ **💬 소통왕:** {best_c['제목']} (💬 {best_c['댓글']}개)")
 
             with col2:
                 st.subheader("7️⃣ 최다 사용 단어 TOP 5")
                 words = re.findall(r'[가-힣]{2,}', " ".join(df['내용'].tolist()))
                 stop_w = ['진짜', '너무', '오늘', '정말', '생각', '있는', '하고', '것은', '나의', '많이']
                 top_words = Counter([w for w in words if w not in stop_w]).most_common(5)
-                
                 fig_bar, ax_bar = plt.subplots()
                 w_labels, w_counts = zip(*top_words)
                 ax_bar.bar(w_labels, w_counts, color='#A0C4FF')
                 st.pyplot(fig_bar)
 
             st.divider()
+            # --- 8번 섹션: 표 형식의 AI 정밀 분석 (수정 완료) ---
             st.subheader("8️⃣ [🤖 게시글별 AI 정밀 분석]")
-            status_text.text("🤖 AI가 게시글 하나하나를 정밀하게 읽고 분석하는 중입니다...")
             
-            # 표 형태 대신 확실한 가독성을 위해 개별 박스 형태로 모든 게시글 출력
+            analysis_rows = ""
             for index, row in df.iterrows():
+                status_text.text(f"🤖 AI 분석 중... ({index+1}/{len(df)})")
                 prompt = (
-                    f"블로그 제목: {row['제목']}\n"
-                    f"내용 요약: {row['내용'][:500]}\n\n"
-                    "위 내용을 바탕으로 아래 정보를 한국어로 작성해줘:\n"
-                    "1. 페르소나 분석: 작성자의 이름, 상태, 성격적 특징을 한 문장으로 요약.\n"
-                    "2. 3줄 요약: 아래 항목별로 한 줄씩 줄바꿈하여 작성.\n"
-                    "주제: [글의 핵심 주제]\n"
-                    "분위기: [글의 느낌과 감성]\n"
-                    "타겟: [추천 독자층]\n"
-                    "(HTML 태그 쓰지 마.)"
+                    f"제목: {row['제목']}\n내용: {row['내용'][:500]}\n\n"
+                    "분석 결과는 반드시 다음 형식을 지켜줘:\n"
+                    "페르소나: [작성자 특징 1문장]\n"
+                    "주제: [주제 설명]\n"
+                    "분위기: [분위기 설명]\n"
+                    "타겟: [독자층 설명]"
                 )
                 
                 try:
                     res = ai_model.generate_content(prompt).text
-                    clean_res = res.replace("<br>", "\n").replace("<br/>", "\n")
                     
-                    # 게시글마다 개별 박스로 출력 (번호 1번부터 시작)
-                    with st.expander(f"📝 글 {index + 1}: {row['제목']}", expanded=True):
-                        st.markdown(f"**👤 페르소나 분석**\n{clean_res.split('2.')[0].replace('1.', '').strip()}")
-                        st.markdown(f"**📍 3줄 요약**\n{clean_res.split('2.')[-1].replace('3줄 요약:', '').strip()}")
+                    # 텍스트에서 정보 추출
+                    persona = re.search(r"페르소나:\s*(.*)", res)
+                    subject = re.search(r"주제:\s*(.*)", res)
+                    mood = re.search(r"분위기:\s*(.*)", res)
+                    target = re.search(r"타겟:\s*(.*)", res)
+                    
+                    p_txt = persona.group(1).strip() if persona else "정보 없음"
+                    s_txt = subject.group(1).strip() if subject else "정보 없음"
+                    m_txt = mood.group(1).strip() if mood else "정보 없음"
+                    t_txt = target.group(1).strip() if target else "정보 없음"
+                    
+                    # HTML 표 행 생성 (줄바꿈 포함)
+                    analysis_rows += f"""
+                    <tr>
+                        <td style='text-align:center;'>{index + 1}</td>
+                        <td><b>{row['제목']}</b></td>
+                        <td>{p_txt}</td>
+                        <td>
+                            <b>주제:</b> {s_txt}<br>
+                            <b>분위기:</b> {m_txt}<br>
+                            <b>타겟:</b> {t_txt}
+                        </td>
+                    </tr>
+                    """
                 except:
-                    st.warning(f"글 {index + 1} 분석 중 오류가 발생했습니다.")
                     continue
 
-            status_text.empty() # 분석 완료 후 상태 메시지 삭제
-            
+            # 최종 HTML 표 출력
+            full_table_html = f"""
+            <table style='width:100%; border-collapse: collapse; border: 1px solid #ddd;'>
+                <thead>
+                    <tr style='background-color: #f2f2f2;'>
+                        <th style='width:5%; border: 1px solid #ddd; padding: 8px;'>번호</th>
+                        <th style='width:25%; border: 1px solid #ddd; padding: 8px;'>블로그 제목</th>
+                        <th style='width:30%; border: 1px solid #ddd; padding: 8px;'>페르소나 분석</th>
+                        <th style='width:40%; border: 1px solid #ddd; padding: 8px;'>3줄 요약</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {analysis_rows}
+                </tbody>
+            </table>
+            """
+            st.markdown(full_table_html, unsafe_allow_html=True)
+            status_text.empty()
+
             st.divider()
             st.subheader("📷 글/사진 구성 비중")
             fig_pie, ax_pie = plt.subplots()
