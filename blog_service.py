@@ -42,7 +42,7 @@ def set_korean_font():
 
 set_korean_font()
 
-# --- 2. AI 모델 설정 (보안 적용 완료) ---
+# --- 2. AI 모델 설정 ---
 try:
     if "GEMINI_API_KEY" in st.secrets:
         GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -67,7 +67,7 @@ def enter_frame(driver):
 
 # --- 3. 웹 화면 UI ---
 st.title("이채연의 네이버 블로그 AI 분석기🤖")
-st.write("아이디를 입력하면 당신의 블로그(전체공개)를 기반으로 AI가 리포트를 작성합니다.")
+st.write("아이디를 입력하면 각 게시글을 AI가 분석하여 인물 특징과 요약 리포트를 표로 작성합니다.")
 
 with st.sidebar:
     st.header("⚙️ 설정")
@@ -100,7 +100,7 @@ if analyze_btn and target_id:
         all_post_links = []
         current_page = 1
         
-        status_text.text("🔗 모든 게시글 링크를 확보하는 중입니다...")
+        status_text.text("🔗 모든 게시글 링크를 수집하는 중...")
         while True:
             enter_frame(driver)
             try:
@@ -122,7 +122,9 @@ if analyze_btn and target_id:
                     if clean_url not in all_post_links:
                         all_post_links.append(clean_url)
             
-            status_text.text(f"🔗 링크 수집 중: {current_page}페이지 완료 (누적 {len(all_post_links)}개)")
+            status_text.text(f"🔗 링크 수집 중: {current_page}페이지 (누적 {len(all_post_links)}개)")
+            
+            if current_page >= 3: break # 너무 많은 양을 방지하기 위해 3페이지로 제한 (조절 가능)
             
             next_p = current_page + 1
             try:
@@ -131,149 +133,71 @@ if analyze_btn and target_id:
                 time.sleep(1)
                 current_page = next_p
             except:
-                try:
-                    next_btn = driver.find_element(By.CSS_SELECTOR, "a.pg_next")
-                    driver.execute_script("arguments[0].click();", next_btn)
-                    time.sleep(1)
-                    current_page = next_p
-                except:
-                    break 
+                break 
 
         data = []
         total_links = len(all_post_links)
         
         if total_links == 0:
-            st.error("수집된 게시글이 없습니다. 아이디를 확인해주세요.")
+            st.error("수집된 게시글이 없습니다.")
             st.stop()
 
+        # 게시글 상세 데이터 수집
         for i, url in enumerate(all_post_links):
-            status_text.text(f"📝 데이터 정밀 분석 중: {i+1}/{total_links} 완료")
+            status_text.text(f"📝 데이터 수집 중: {i+1}/{total_links}")
             driver.get(url)
-            time.sleep(0.8)
+            time.sleep(0.7)
             enter_frame(driver)
             
             try:
-                date_text = ""
-                for s in ["span.se_publishDate.pcol2", "span.se_publishDate", ".date"]:
-                    try:
-                        date_text = driver.find_element(By.CSS_SELECTOR, s).get_attribute('innerText').strip()
-                        if date_text: break
-                    except: continue
-
                 title = WebDriverWait(driver, 5).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, ".se-title-text, .pcol1, .itemSubjectBoldfont"))
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".se-title-text, .pcol1"))
                 ).text.strip()
+                content = driver.find_element(By.CSS_SELECTOR, ".se-main-container, #postViewArea").text.strip()[:1000] # 분석을 위해 앞부분 1000자만 사용
                 
-                content_el = driver.find_element(By.CSS_SELECTOR, ".se-main-container, #postViewArea")
-                content = content_el.text.strip()
-                img_count = len(content_el.find_elements(By.TAG_NAME, "img"))
-                
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(0.2)
-                l_count = 0
-                try:
-                    l_count = int(re.sub(r'[^0-9]', '', driver.find_element(By.CSS_SELECTOR, "span.u_likeit_text._count.num").get_attribute('innerText')))
-                except: pass
-                c_count = 0
-                try:
-                    c_count = int(re.sub(r'[^0-9]', '', driver.find_element(By.ID, "commentCount").get_attribute('innerText')))
-                except: pass
-
-                data.append({
-                    "제목": title, "내용": content, "게시일": date_text, 
-                    "좋아요": l_count, "댓글": c_count, "글자수": len(content), "이미지수": img_count
-                })
+                data.append({"제목": title, "내용": content})
             except:
                 continue
-            
             progress_bar.progress(int((i + 1) / total_links * 100))
 
         if data:
-            df = pd.DataFrame(data)
+            status_text.text("🤖 AI가 게시글별로 심층 분석 중입니다...")
+            analysis_results = []
             
-            def parse_dt(text):
-                nums = re.findall(r'\d+', str(text))
-                return nums if len(nums) >= 5 else None
-            df['dt_list'] = df['게시일'].apply(parse_dt)
-            df = df.dropna(subset=['dt_list'])
-            df['hour'] = df['dt_list'].apply(lambda x: int(x[3]))
-            df['month'] = df['dt_list'].apply(lambda x: int(x[1]))
-            
-            def get_season(m):
-                if m in [3, 4, 5]: return "봄 🌱"
-                elif m in [6, 7, 8]: return "여름 ☀️"
-                elif m in [9, 10, 11]: return "가을 🍂"
-                else: return "겨울 ❄️"
-            df['계절'] = df['month'].apply(get_season)
-
-            status_text.text("🤖 AI가 페르소나 리포트를 최종 생성하고 있습니다...")
-            
-            # --- AI 프롬프트 수정 파트 ---
-            titles_summary = "\n".join(df['제목'].tolist()[:30])
-            prompt = (
-                f"다음 블로그 제목들을 분석해줘:\n{titles_summary}\n\n"
-                "분석 결과는 아래 형식으로만 작성해줘:\n"
-                "1. 페르소나 분석: 작성자의 이름, 현재 상태(예: 휴학생), 성격적 특징을 포함하여 설명해줘.\n"
-                "2. 3줄 요약: 블로그의 핵심 내용과 문위기를 3문장으로 정리해줘.\n"
-                "(주의: '주제 분석', '목표', '특징' 섹션은 제외해줘. HTML 태그인 <br>은 절대 쓰지 말고 줄바꿈으로만 구분해줘.)"
-            )
-            ai_res = ai_model.generate_content(prompt).text
+            for item in data:
+                # --- AI 프롬프트: 개별 글 분석 및 3열 구성 ---
+                prompt = (
+                    f"블로그 제목: {item['제목']}\n내용 요약: {item['내용']}\n\n"
+                    "위 내용을 분석해서 다음 두 항목을 작성해줘:\n"
+                    "1. 인물 특징: 이 글에서 나타나는 작성자의 성격이나 특징을 1문장으로 써줘.\n"
+                    "2. 3줄 요약: 글의 '주제', '분위기', '타겟'을 각각 명시해서 3문장으로 요약해줘.\n"
+                    "결과에 HTML 태그(<br> 등)는 절대 쓰지 마."
+                )
+                
+                try:
+                    res = ai_model.generate_content(prompt).text.strip()
+                    # 응답에서 인물 특징과 요약 부분을 분리 (AI 응답 형식에 맞게 파싱)
+                    parts = res.split('\n')
+                    persona = next((p for p in parts if "인물 특징" in p), "분석 중").replace("1. 인물 특징:", "").strip()
+                    summary = "\n".join([p for p in parts if "주제" in p or "분위" in p or "타겟" in p or "요약" in p])
+                    
+                    analysis_results.append({
+                        "블로그 제목": item['제목'],
+                        "인물 특징": persona,
+                        "3줄 요약 (주제/분위기/타겟)": summary
+                    })
+                except:
+                    continue
 
             st.balloons()
-            st.header(f"📊 {target_id} 블로그 최종 분석 리포트")
+            st.header(f"📊 {target_id} 블로그 게시글별 AI 분석 리포트")
             st.divider()
 
-            col1, col2 = st.columns([1, 1.2])
-            with col1:
-                st.subheader("📌 핵심 지표")
-                st.write(f"1️⃣ 총 게시물 수: **{len(df)}개**")
-                st.write(f"2️⃣ 가장 활발한 계절: **{df['계절'].mode()[0]}**")
-                st.write(f"3️⃣ 주요 활동 시간대: **{df['hour'].mode()[0]}시**")
-                st.write(f"4️⃣ 콘텐츠 구성: **✍️{df['글자수'].sum():,}자 / 📷{df['이미지수'].sum()}장**")
-                
-                best_l = df.loc[df['좋아요'].idxmax()]
-                best_c = df.loc[df['댓글'].idxmax()]
-                
-                st.info(f"5️⃣ **🏆 인기왕: 공감을 가장 많이 받은 포스트** \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
-                st.success(f"6️⃣ **💬 소통왕: 댓글을 가장 많이 받은 포스트** \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
-
-            with col2:
-                st.subheader("7️⃣ 최다 사용 단어 TOP 5")
-                words = re.findall(r'[가-힣]{2,}', " ".join(df['내용'].tolist()))
-                stop_w = ['진짜', '너무', '오늘', '정말', '생각', '있는', '하고', '것은', '나의', '많이']
-                top_words = Counter([w for w in words if w not in stop_w]).most_common(5)
-                
-                fig_bar, ax_bar = plt.subplots()
-                w_labels, w_counts = zip(*top_words)
-                ax_bar.bar(w_labels, w_counts, color='#A0C4FF')
-                st.pyplot(fig_bar)
-
-            st.divider()
-            st.subheader("8️⃣ [🤖 AI 심층 리포트]")
-            # <br> 제거 및 텍스트 정제 출력
-            clean_ai_res = ai_res.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
-            st.info(clean_ai_res)
-            
-            st.subheader("📷 글/사진 구성 비중")
-            fig_pie, ax_pie = plt.subplots()
-            ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()*100], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
-            st.pyplot(fig_pie)
+            # --- 결과 표 출력 ---
+            result_df = pd.DataFrame(analysis_results)
+            st.table(result_df) # 3열 표로 모든 글 내용 출력
 
     except Exception as e:
-        st.error(f"⚠️ 분석 중 오류 발생: {e}")
-    
-else:
-    if analyze_btn and not target_id:
-        st.warning("분석할 네이버 ID를 입력해주세요.")
-
-
-
-
-
-
-
-
-
-
-
-
+        st.error(f"⚠️ 오류 발생: {e}")
+    finally:
+        driver.quit()
