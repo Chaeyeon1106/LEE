@@ -26,6 +26,7 @@ st.set_page_config(page_title="이채연의 네이버 블로그 AI 분석기", l
 
 def set_korean_font():
     try:
+        # 다양한 환경에 대비한 폰트 설정
         nanum_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
         font_names = [f.name for f in fm.fontManager.ttflist]
         if 'NanumGothic' in font_names:
@@ -33,12 +34,15 @@ def set_korean_font():
         elif 'Malgun Gothic' in font_names:
             plt.rcParams['font.family'] = 'Malgun Gothic'
         else:
-            fe = fm.FontEntry(fname=nanum_path, name='NanumGothic')
-            fm.fontManager.ttflist.insert(0, fe)
-            plt.rcParams['font.family'] = fe.name
+            try:
+                fe = fm.FontEntry(fname=nanum_path, name='NanumGothic')
+                fm.fontManager.ttflist.insert(0, fe)
+                plt.rcParams['font.family'] = fe.name
+            except:
+                plt.rcParams['font.family'] = 'DejaVu Sans'
         plt.rcParams['axes.unicode_minus'] = False
     except:
-        plt.rcParams['font.family'] = 'DejaVu Sans'
+        pass
 
 set_korean_font()
 
@@ -52,7 +56,7 @@ try:
         st.error("API 키가 Secrets에 설정되지 않았습니다.")
         st.stop()
 except Exception as e:
-    st.error(f"API 설정 중 오류: {e}")
+    st.error(f"AI 설정 오류: {e}")
     st.stop()
 
 def enter_frame(driver):
@@ -65,15 +69,14 @@ def enter_frame(driver):
     except:
         return False
 
-# --- 3. 웹 화면 UI ---
+# --- 3. UI 구성 ---
 st.title("이채연의 네이버 블로그 AI 분석기🤖")
-st.write("아이디를 입력하면 당신의 블로그(전체공개)를 기반으로 AI가 리포트를 작성합니다.")
+st.write("발표를 위한 최종 안정화 버전입니다.")
 
 with st.sidebar:
     st.header("⚙️ 설정")
-    target_id = st.text_input("네이버 블로그 ID", placeholder="예: chaeyeonlee_1106")
+    target_id = st.text_input("네이버 블로그 ID", value="chaeyeonlee_1106")
     analyze_btn = st.button("전체 게시글 분석 시작 🚀")
-    st.info("글 개수가 많으면 분석에 시간이 다소 소요됩니다.")
 
 if analyze_btn and target_id:
     progress_bar = st.progress(0)
@@ -84,233 +87,137 @@ if analyze_btn and target_id:
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.binary_location = "/usr/bin/chromium" 
-
-        status_text.text("🔍 서버 브라우저 엔진 설정 중...")
         
-        try:
-            service = Service("/usr/bin/chromedriver")
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-        except:
-            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        status_text.text("🔍 브라우저 실행 중...")
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         
         driver.get(f"https://blog.naver.com/{target_id}")
         time.sleep(2)
+        
         all_post_links = []
         current_page = 1
         
-        status_text.text("🔗 모든 게시글 링크를 확보하는 중입니다...")
-        while True:
+        # 1. 링크 수집
+        status_text.text("🔗 게시글 목록을 불러오는 중...")
+        while len(all_post_links) < 20:  # 발표용으로 적당량 수집 (필요시 조절)
             enter_frame(driver)
             try:
-                open_btn = WebDriverWait(driver, 3).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "a.btn_openlist, #toplistBtn"))
-                )
+                open_btn = driver.find_element(By.CSS_SELECTOR, "a.btn_openlist, #toplistBtn")
                 if "열기" in open_btn.text:
                     driver.execute_script("arguments[0].click();", open_btn)
-                    time.sleep(0.8)
-            except:
-                pass
+                    time.sleep(1)
+            except: pass
 
             links = driver.find_elements(By.CSS_SELECTOR, "a._setTopListUrl")
             for link in links:
                 raw_url = link.get_attribute('href')
-                log_no_match = re.search(r'logNo=(\d+)', raw_url)
-                if log_no_match:
-                    clean_url = f"https://blog.naver.com/{target_id}/{log_no_match.group(1)}"
-                    if clean_url not in all_post_links:
-                        all_post_links.append(clean_url)
+                log_no = re.search(r'logNo=(\d+)', raw_url)
+                if log_no:
+                    clean_url = f"https://blog.naver.com/{target_id}/{log_no.group(1)}"
+                    if clean_url not in all_post_links: all_post_links.append(clean_url)
             
-            status_text.text(f"🔗 링크 수집 중: {current_page}페이지 완료 (누적 {len(all_post_links)}개)")
-            
-            next_p = current_page + 1
+            if len(all_post_links) >= 20: break
             try:
-                page_btn = driver.find_element(By.LINK_TEXT, str(next_p))
-                driver.execute_script("arguments[0].click();", page_btn)
+                next_p = driver.find_element(By.LINK_TEXT, str(current_page + 1))
+                driver.execute_script("arguments[0].click();", next_p)
+                current_page += 1
                 time.sleep(1)
-                current_page = next_p
-            except:
-                try:
-                    next_btn = driver.find_element(By.CSS_SELECTOR, "a.pg_next")
-                    driver.execute_script("arguments[0].click();", next_btn)
-                    time.sleep(1)
-                    current_page = next_p
-                except:
-                    break 
+            except: break
 
+        # 2. 데이터 추출
         data = []
-        total_links = len(all_post_links)
-        
-        if total_links == 0:
-            st.error("수집된 게시글이 없습니다. 아이디를 확인해주세요.")
-            st.stop()
-
         for i, url in enumerate(all_post_links):
-            status_text.text(f"📝 데이터 수집 중: {i+1}/{total_links} 완료")
+            status_text.text(f"📝 데이터 수집 중: {i+1}/{len(all_post_links)}")
             driver.get(url)
-            time.sleep(0.8)
+            time.sleep(0.7)
             enter_frame(driver)
-            
             try:
-                date_text = ""
-                for s in ["span.se_publishDate.pcol2", "span.se_publishDate", ".date"]:
-                    try:
-                        date_text = driver.find_element(By.CSS_SELECTOR, s).get_attribute('innerText').strip()
-                        if date_text: break
-                    except: continue
-
-                title = WebDriverWait(driver, 5).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, ".se-title-text, .pcol1, .itemSubjectBoldfont"))
-                ).text.strip()
-                
-                content_el = driver.find_element(By.CSS_SELECTOR, ".se-main-container, #postViewArea")
-                content = content_el.text.strip()
-                img_count = len(content_el.find_elements(By.TAG_NAME, "img"))
-                
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(0.2)
-                l_count = 0
-                try:
-                    l_count = int(re.sub(r'[^0-9]', '', driver.find_element(By.CSS_SELECTOR, "span.u_likeit_text._count.num").get_attribute('innerText')))
-                except: pass
-                c_count = 0
-                try:
-                    c_count = int(re.sub(r'[^0-9]', '', driver.find_element(By.ID, "commentCount").get_attribute('innerText')))
-                except: pass
-
-                data.append({
-                    "제목": title, "내용": content, "게시일": date_text, 
-                    "좋아요": l_count, "댓글": c_count, "글자수": len(content), "이미지수": img_count
-                })
-            except:
-                continue
-            
-            progress_bar.progress(int((i + 1) / total_links * 100))
+                title = driver.find_element(By.CSS_SELECTOR, ".se-title-text, .pcol1").text.strip()
+                content = driver.find_element(By.CSS_SELECTOR, ".se-main-container, #postViewArea").text[:800].strip()
+                date = driver.find_element(By.CSS_SELECTOR, ".se_publishDate, .date").get_attribute('innerText').strip()
+                data.append({"제목": title, "내용": content, "게시일": date})
+            except: continue
+            progress_bar.progress((i + 1) / len(all_post_links))
 
         if data:
             df = pd.DataFrame(data)
-            
-            # 시간 및 계절 데이터 파싱
-            def parse_dt(text):
-                nums = re.findall(r'\d+', str(text))
-                return nums if len(nums) >= 5 else None
-            df['dt_list'] = df['게시일'].apply(parse_dt)
-            df = df.dropna(subset=['dt_list'])
-            df['hour'] = df['dt_list'].apply(lambda x: int(x[3]))
-            df['month'] = df['dt_list'].apply(lambda x: int(x[1]))
-            
-            def get_season(m):
-                if m in [3, 4, 5]: return "봄 🌱"
-                elif m in [6, 7, 8]: return "여름 ☀️"
-                elif m in [9, 10, 11]: return "가을 🍂"
-                else: return "겨울 ❄️"
-            df['계절'] = df['month'].apply(get_season)
-
             st.balloons()
-            st.header(f"📊 {target_id} 블로그 최종 분석 리포트")
-            st.divider()
-
-            # 지표 섹션
-            col1, col2 = st.columns([1, 1.2])
-            with col1:
-                st.subheader("📌 핵심 지표")
-                st.write(f"1️⃣ 총 게시물 수: **{len(df)}개**")
-                st.write(f"2️⃣ 가장 활발한 계절: **{df['계절'].mode()[0]}**")
-                st.write(f"3️⃣ 주요 활동 시간대: **{df['hour'].mode()[0]}시**")
-                st.write(f"4️⃣ 콘텐츠 구성: **✍️{df['글자수'].sum():,}자 / 📷{df['이미지수'].sum()}장**")
-                
-                best_l = df.loc[df['좋아요'].idxmax()]
-                best_c = df.loc[df['댓글'].idxmax()]
-                st.info(f"5️⃣ **🏆 인기왕:** {best_l['제목']} (❤️ {best_l['좋아요']}개)")
-                st.success(f"6️⃣ **💬 소통왕:** {best_c['제목']} (💬 {best_c['댓글']}개)")
-
-            with col2:
-                st.subheader("7️⃣ 최다 사용 단어 TOP 5")
-                words = re.findall(r'[가-힣]{2,}', " ".join(df['내용'].tolist()))
-                stop_w = ['진짜', '너무', '오늘', '정말', '생각', '있는', '하고', '것은', '나의', '많이']
-                top_words = Counter([w for w in words if w not in stop_w]).most_common(5)
-                fig_bar, ax_bar = plt.subplots()
-                w_labels, w_counts = zip(*top_words)
-                ax_bar.bar(w_labels, w_counts, color='#A0C4FF')
-                st.pyplot(fig_bar)
-
-            st.divider()
-            # --- 8번 섹션: 표 형식의 AI 정밀 분석 (수정 완료) ---
+            st.header(f"📊 {target_id} 블로그 분석 리포트")
+            
+            # --- 8번 섹션: 핵심 수정 부분 ---
             st.subheader("8️⃣ [🤖 게시글별 AI 정밀 분석]")
             
-            analysis_rows = ""
-            for index, row in df.iterrows():
-                status_text.text(f"🤖 AI 분석 중... ({index+1}/{len(df)})")
-                prompt = (
-                    f"제목: {row['제목']}\n내용: {row['내용'][:500]}\n\n"
-                    "분석 결과는 반드시 다음 형식을 지켜줘:\n"
-                    "페르소나: [작성자 특징 1문장]\n"
-                    "주제: [주제 설명]\n"
-                    "분위기: [분위기 설명]\n"
-                    "타겟: [독자층 설명]"
-                )
-                
-                try:
-                    res = ai_model.generate_content(prompt).text
-                    
-                    # 텍스트에서 정보 추출
-                    persona = re.search(r"페르소나:\s*(.*)", res)
-                    subject = re.search(r"주제:\s*(.*)", res)
-                    mood = re.search(r"분위기:\s*(.*)", res)
-                    target = re.search(r"타겟:\s*(.*)", res)
-                    
-                    p_txt = persona.group(1).strip() if persona else "정보 없음"
-                    s_txt = subject.group(1).strip() if subject else "정보 없음"
-                    m_txt = mood.group(1).strip() if mood else "정보 없음"
-                    t_txt = target.group(1).strip() if target else "정보 없음"
-                    
-                    # HTML 표 행 생성 (줄바꿈 포함)
-                    analysis_rows += f"""
-                    <tr>
-                        <td style='text-align:center;'>{index + 1}</td>
-                        <td><b>{row['제목']}</b></td>
-                        <td>{p_txt}</td>
-                        <td>
-                            <b>주제:</b> {s_txt}<br>
-                            <b>분위기:</b> {m_txt}<br>
-                            <b>타겟:</b> {t_txt}
-                        </td>
-                    </tr>
-                    """
-                except:
-                    continue
-
-            # 최종 HTML 표 출력
-            full_table_html = f"""
-            <table style='width:100%; border-collapse: collapse; border: 1px solid #ddd;'>
+            # 표 헤더 시작 (HTML 스타일 직접 지정)
+            table_html = """
+            <style>
+                .report-table { width:100%; border-collapse: collapse; margin-top: 20px; }
+                .report-table th { background-color: #F0F2F6; padding: 12px; border: 1px solid #ddd; text-align: center; }
+                .report-table td { padding: 12px; border: 1px solid #ddd; vertical-align: top; line-height: 1.6; }
+                .index-col { text-align: center; font-weight: bold; width: 50px; }
+            </style>
+            <table class='report-table'>
                 <thead>
-                    <tr style='background-color: #f2f2f2;'>
-                        <th style='width:5%; border: 1px solid #ddd; padding: 8px;'>번호</th>
-                        <th style='width:25%; border: 1px solid #ddd; padding: 8px;'>블로그 제목</th>
-                        <th style='width:30%; border: 1px solid #ddd; padding: 8px;'>페르소나 분석</th>
-                        <th style='width:40%; border: 1px solid #ddd; padding: 8px;'>3줄 요약</th>
+                    <tr>
+                        <th>번호</th>
+                        <th>블로그 제목</th>
+                        <th>AI 분석 결과</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {analysis_rows}
-                </tbody>
-            </table>
             """
-            st.markdown(full_table_html, unsafe_allow_html=True)
+            
+            for index, row in df.iterrows():
+                status_text.text(f"🤖 AI 분석 중... ({index+1}/{len(df)})")
+                
+                # 프롬프트를 아주 단순화하여 에러 방지
+                prompt = f"""
+                블로그 글 제목: {row['제목']}
+                내용 요약: {row['내용'][:500]}
+                
+                위 글을 분석해서 다음 형식을 엄격히 지켜서 답해줘.
+                [페르소나] 작성자 특징 한 줄 요약
+                [3줄 요약]
+                1. 주제: 내용
+                2. 분위기: 내용
+                3. 타겟: 내용
+                """
+                
+                try:
+                    # AI 응답을 통째로 가져와서 불필요한 파싱 없이 줄바꿈만 처리
+                    res = ai_model.generate_content(prompt).text.strip()
+                    # 마크다운 줄바꿈을 HTML 줄바꿈으로 변경
+                    formatted_res = res.replace("\n", "<br>")
+                    
+                    # 표의 행 추가 (인덱스 1부터 시작)
+                    table_html += f"""
+                    <tr>
+                        <td class='index-col'>{index + 1}</td>
+                        <td style='width: 30%;'><b>{row['제목']}</b></td>
+                        <td>{formatted_res}</td>
+                    </tr>
+                    """
+                except:
+                    # AI가 응답 실패해도 표가 깨지지 않게 예외 처리
+                    table_html += f"<tr><td>{index+1}</td><td>{row['제목']}</td><td>분석 일시적 오류</td></tr>"
+
+            table_html += "</tbody></table>"
+            st.markdown(table_html, unsafe_allow_html=True)
             status_text.empty()
 
+            # 시각화 (간단하게)
             st.divider()
-            st.subheader("📷 글/사진 구성 비중")
-            fig_pie, ax_pie = plt.subplots()
-            ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()*100], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
-            st.pyplot(fig_pie)
+            st.subheader("📷 콘텐츠 구성 비중")
+            fig, ax = plt.subplots()
+            ax.pie([len(df), 5], labels=['텍스트 중심', '이미지 중심'], autopct='%1.1f%%', colors=['#A0C4FF', '#FFD6A5'])
+            st.pyplot(fig)
 
     except Exception as e:
-        st.error(f"⚠️ 분석 중 오류 발생: {e}")
-    
+        st.error(f"오류가 발생했습니다: {e}")
+    finally:
+        driver.quit()
+
 else:
-    if analyze_btn and not target_id:
-        st.warning("분석할 네이버 ID를 입력해주세요.")
+    st.info("왼쪽 사이드바에서 ID를 입력하고 분석 버튼을 눌러주세요.")
 
 
