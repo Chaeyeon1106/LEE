@@ -258,3 +258,4 @@ else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
 
+
