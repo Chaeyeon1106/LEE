@@ -210,9 +210,7 @@ if analyze_btn and target_id:
             
             titles_summary = "\n".join(df['제목'].tolist()[:30])
             prompt = f"다음 블로그 제목들을 보고 주제, 페르소나 분석, 3줄 요약을 한국어로 작성해줘:\n{titles_summary}"
-            
-            # [수정됨] .replace("<br>", "\n")을 추가하여 태그 제거
-            ai_res = ai_model.generate_content(prompt).text.replace("<br>", "\n").replace("<br/>", "\n")
+            ai_res = ai_model.generate_content(prompt).text
 
             st.balloons()
             st.header(f"📊 {target_id} 블로그 최종 분석 리포트")
@@ -258,6 +256,7 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
+
 
 
 
