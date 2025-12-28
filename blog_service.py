@@ -147,7 +147,7 @@ if analyze_btn and target_id:
             st.stop()
 
         for i, url in enumerate(all_post_links):
-            status_text.text(f"📝 데이터 정밀 분석 중: {i+1}/{total_links} 완료")
+            status_text.text(f"📝 데이터 수집 중: {i+1}/{total_links} 완료")
             driver.get(url)
             time.sleep(0.8)
             enter_frame(driver)
@@ -206,50 +206,6 @@ if analyze_btn and target_id:
                 else: return "겨울 ❄️"
             df['계절'] = df['month'].apply(get_season)
 
-            status_text.text("🤖 AI가 게시글별 정밀 분석 리포트를 생성하고 있습니다...")
-            
-            # --- 8번 섹션: 게시글별 AI 분석 리포트 생성 (수정 로직) ---
-            analysis_results = []
-            
-            for index, row in df.iterrows():
-                # 제목과 본문 내용을 결합하여 문맥 파악 강화
-                prompt = (
-                    f"블로그 제목: {row['제목']}\n"
-                    f"본문 요약: {row['내용'][:600]}\n\n"
-                    "위 정보를 분석하여 아래 형식으로 출력해줘:\n"
-                    "1. 페르소나 분석: 작성자의 인물 특징(성격, 가치관, 현재 상황 등)을 친근하게 분석하여 한 문장으로 작성.\n"
-                    "2. 3줄 요약: 아래 형식을 엄격히 지키고 각 항목 끝에 반드시 줄바꿈을 넣어줘.\n"
-                    "주제: [이 글의 핵심 주제]\n"
-                    "분위기: [이 글의 전체적인 감성과 톤]\n"
-                    "타겟: [이 글을 읽으면 좋을 독자층]\n"
-                    "(HTML 태그는 쓰지 말고 줄바꿈 문자로만 구분해줘.)"
-                )
-                
-                try:
-                    res = ai_model.generate_content(prompt).text
-                    lines = res.strip().split('\n')
-                    
-                    persona = "분석 중"
-                    summary_list = []
-                    
-                    for line in lines:
-                        if "페르소나" in line:
-                            persona = line.split(':')[-1].strip()
-                        if any(key in line for key in ["주제:", "분위기:", "타겟:"]):
-                            summary_list.append(line.strip())
-                    
-                    # 마크다운에서 강제 줄바꿈을 위해 <br> 대신 공백 두번 + 줄바꿈 사용
-                    summary_final = "  \n".join(summary_list)
-                    
-                    analysis_results.append({
-                        "번호": index + 1,
-                        "블로그 제목": row['제목'],
-                        "페르소나 분석": persona,
-                        "3줄 요약": summary_final
-                    })
-                except:
-                    continue
-
             st.balloons()
             st.header(f"📊 {target_id} 블로그 최종 분석 리포트")
             st.divider()
@@ -281,20 +237,37 @@ if analyze_btn and target_id:
 
             st.divider()
             st.subheader("8️⃣ [🤖 게시글별 AI 정밀 분석]")
+            status_text.text("🤖 AI가 게시글 하나하나를 정밀하게 읽고 분석하는 중입니다...")
             
-            if analysis_results:
-                # 표 내의 줄바꿈을 확실히 보여주기 위해 마크다운 표를 직접 렌더링
-                header = "| 번호 | 블로그 제목 | 페르소나 분석 | 3줄 요약 |\n| :--- | :--- | :--- | :--- |\n"
-                rows = ""
-                for item in analysis_results:
-                    # 마크다운 표 안에서의 줄바꿈 처리를 위해 <br> 사용
-                    formatted_summary = item['3줄 요약'].replace("\n", "<br>")
-                    rows += f"| {item['번호']} | {item['블로그 제목']} | {item['페르소나 분석']} | {formatted_summary} |\n"
+            # 표 형태 대신 확실한 가독성을 위해 개별 박스 형태로 모든 게시글 출력
+            for index, row in df.iterrows():
+                prompt = (
+                    f"블로그 제목: {row['제목']}\n"
+                    f"내용 요약: {row['내용'][:500]}\n\n"
+                    "위 내용을 바탕으로 아래 정보를 한국어로 작성해줘:\n"
+                    "1. 페르소나 분석: 작성자의 이름, 상태, 성격적 특징을 한 문장으로 요약.\n"
+                    "2. 3줄 요약: 아래 항목별로 한 줄씩 줄바꿈하여 작성.\n"
+                    "주제: [글의 핵심 주제]\n"
+                    "분위기: [글의 느낌과 감성]\n"
+                    "타겟: [추천 독자층]\n"
+                    "(HTML 태그 쓰지 마.)"
+                )
                 
-                st.markdown(header + rows, unsafe_allow_html=True)
-            else:
-                st.warning("분석 결과가 없습니다.")
+                try:
+                    res = ai_model.generate_content(prompt).text
+                    clean_res = res.replace("<br>", "\n").replace("<br/>", "\n")
+                    
+                    # 게시글마다 개별 박스로 출력 (번호 1번부터 시작)
+                    with st.expander(f"📝 글 {index + 1}: {row['제목']}", expanded=True):
+                        st.markdown(f"**👤 페르소나 분석**\n{clean_res.split('2.')[0].replace('1.', '').strip()}")
+                        st.markdown(f"**📍 3줄 요약**\n{clean_res.split('2.')[-1].replace('3줄 요약:', '').strip()}")
+                except:
+                    st.warning(f"글 {index + 1} 분석 중 오류가 발생했습니다.")
+                    continue
 
+            status_text.empty() # 분석 완료 후 상태 메시지 삭제
+            
+            st.divider()
             st.subheader("📷 글/사진 구성 비중")
             fig_pie, ax_pie = plt.subplots()
             ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()*100], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
@@ -306,4 +279,5 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 네이버 ID를 입력해주세요.")
+
 
