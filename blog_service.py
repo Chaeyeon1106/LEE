@@ -4,6 +4,8 @@
 #https://nblog-analyzer-by-chaeyeon.streamlit.app/
 #Streamlit Cloud 대시보드 -> Settings -> Secrets 메뉴에 아래 내용을 정확히 입력하고 저장(Save)
 
+
+#라이브러리 
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
@@ -11,7 +13,6 @@ import matplotlib.pyplot as plt
 import re
 import time
 import matplotlib.font_manager as fm 
-import json  # json import 위치 수정
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -86,11 +87,15 @@ if analyze_btn and target_id:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
+        chrome_options.binary_location = "/usr/bin/chromium" 
 
         status_text.text("🔍 서버 브라우저 엔진 설정 중...")
         
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        try:
+            service = Service("/usr/bin/chromedriver")
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        except:
+            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         
         driver.get(f"https://blog.naver.com/{target_id}")
         time.sleep(2)
@@ -119,16 +124,22 @@ if analyze_btn and target_id:
                     if clean_url not in all_post_links:
                         all_post_links.append(clean_url)
             
-            if len(all_post_links) >= 30: break # 속도를 위해 30개 제한 (조정 가능)
+            status_text.text(f"🔗 링크 수집 중: {current_page}페이지 완료 (누적 {len(all_post_links)}개)")
             
+            next_p = current_page + 1
             try:
-                next_p = current_page + 1
                 page_btn = driver.find_element(By.LINK_TEXT, str(next_p))
                 driver.execute_script("arguments[0].click();", page_btn)
                 time.sleep(1)
                 current_page = next_p
             except:
-                break 
+                try:
+                    next_btn = driver.find_element(By.CSS_SELECTOR, "a.pg_next")
+                    driver.execute_script("arguments[0].click();", next_btn)
+                    time.sleep(1)
+                    current_page = next_p
+                except:
+                    break 
 
         data = []
         total_links = len(all_post_links)
@@ -200,28 +211,8 @@ if analyze_btn and target_id:
             status_text.text("🤖 AI가 리포트를 생성하고 있습니다...")
             
             titles_summary = "\n".join(df['제목'].tolist()[:30])
-            
-            prompt = f"""
-            너는 블로그 분석 AI다.
-            아래 JSON 형식으로만 출력해라.
-            설명 문장, 인삿말, 추가 텍스트는 절대 출력하지 마라.
-            키 이름을 절대 변경하지 마라.
-            
-            {{
-              "main_topics": ["", "", ""],
-              "persona": {{
-                "tone": "",
-                "interests": ["", "", ""],
-                "writing_style": ""
-              }},
-              "summary": ["", "", ""]
-            }}
-            
-            [분석 대상 블로그 제목]
-            {titles_summary}
-            """
-            
-            ai_raw = ai_model.generate_content(prompt).text
+            prompt = f"다음 블로그 제목들을 보고 주제, 페르소나 분석, 3줄 요약을 한국어로 작성해줘:\n{titles_summary}"
+            ai_res = ai_model.generate_content(prompt).text
 
             st.balloons()
             st.header(f"📊 {target_id} 블로그 최종 분석 리포트")
@@ -254,51 +245,16 @@ if analyze_btn and target_id:
 
             st.divider()
             st.subheader("8️⃣ [🤖 AI 심층 리포트]")
-
-            try:
-                # 불필요한 마크다운 코드 블록 제거 후 파싱
-                clean_json = ai_raw.replace('```json', '').replace('```', '').strip()
-                ai_json = json.loads(clean_json)
-    
-                st.markdown("### 🧠 블로그 취향 분석")
-    
-                st.markdown("**📌 주요 주제**")
-                for t in ai_json["main_topics"]:
-                    st.write(f"- {t}")
-    
-                st.markdown("**👤 블로그 페르소나**")
-                st.write(f"- 성향: {ai_json['persona']['tone']}")
-                st.write(f"- 글쓰기 스타일: {ai_json['persona']['writing_style']}")
-    
-                interests = ", ".join(ai_json["persona"]["interests"])
-                st.write(f"- 관심사: {interests}")
-    
-                st.markdown("**✍️ 3줄 요약**")
-                for s in ai_json["summary"]:
-                    st.write(f"- {s}")
-    
-            except Exception as e:
-                st.error("⚠️ AI 분석 결과를 해석하는 데 실패했습니다.")
-                st.code(ai_raw) 
-    
-            st.divider()    
+            st.info(ai_res)
+            
             st.subheader("📷 글/사진 구성 비중")
             fig_pie, ax_pie = plt.subplots()
-            ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
+            ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()*100], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
             st.pyplot(fig_pie)
 
-        driver.quit() # 브라우저 종료 추가
-
     except Exception as e:
-        st.error(f"⚠️ 오류 발생: {e}")
-
+        st.error(f"⚠️ 분석 중 오류 발생: {e}")
+    
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 블로그 ID를 입력해주세요.")
-
-
-
-
-
-
-
