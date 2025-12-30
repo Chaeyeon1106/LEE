@@ -209,9 +209,32 @@ if analyze_btn and target_id:
 
             status_text.text("🤖 AI가 리포트를 생성하고 있습니다...")
             
+            import json
+
             titles_summary = "\n".join(df['제목'].tolist()[:30])
-            prompt = f"다음 블로그 제목들을 보고 주제, 페르소나 분석, 3줄 요약을 한국어로 작성해줘:\n{titles_summary}"
-            ai_res = ai_model.generate_content(prompt).text
+            
+            prompt = f"""
+            너는 블로그 분석 AI다.
+            아래 JSON 형식으로만 출력해라.
+            설명 문장, 인삿말, 추가 텍스트는 절대 출력하지 마라.
+            키 이름을 절대 변경하지 마라.
+            
+            {{
+              "main_topics": ["", "", ""],
+              "persona": {{
+                "tone": "",
+                "interests": ["", "", ""],
+                "writing_style": ""
+              }},
+              "summary": ["", "", ""]
+            }}
+            
+            [분석 대상 블로그 제목]
+            {titles_summary}
+            """
+            
+            ai_raw = ai_model.generate_content(prompt).text
+
 
             st.balloons()
             st.header(f"📊 {target_id} 블로그 최종 분석 리포트")
@@ -228,8 +251,8 @@ if analyze_btn and target_id:
                 best_l = df.loc[df['좋아요'].idxmax()]
                 best_c = df.loc[df['댓글'].idxmax()]
                 
-                st.info(f"5️⃣ ❤️ 공감 1위:  \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
-                st.success(f"6️⃣ 💬 댓글 1위:  \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
+                st.info(f"5️⃣ **❤️ 공감 1위: ** \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
+                st.success(f"6️⃣ **💬 댓글 1위: ** \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
 
             with col2:
                 st.subheader("7️⃣ 최다 사용 단어 TOP 5")
@@ -242,9 +265,34 @@ if analyze_btn and target_id:
                 ax_bar.bar(w_labels, w_counts, color='#A0C4FF')
                 st.pyplot(fig_bar)
 
-            st.divider()
-            st.subheader("8️⃣ [🤖 AI 심층 리포트]")
-            st.info(ai_res)
+        st.divider()
+        st.subheader("8️⃣ [🤖 AI 심층 리포트]")
+
+        try:
+            ai_json = json.loads(ai_raw)
+
+            st.markdown("### 🧠 블로그 취향 분석")
+
+            st.markdown("**📌 주요 주제**")
+            for t in ai_json["main_topics"]:
+                st.write(f"- {t}")
+
+            st.markdown("**👤 블로그 페르소나**")
+            st.write(f"- 성향: {ai_json['persona']['tone']}")
+            st.write(f"- 글쓰기 스타일: {ai_json['persona']['writing_style']}")
+
+            st.write("- 관심사:")
+            for i in ai_json["persona"]["interests"]:
+                st.write(f"  • {i}")
+
+            st.markdown("**✍️ 3줄 요약**")
+            for s in ai_json["summary"]:
+                st.write(f"- {s}")
+
+        except Exception as e:
+            st.error("⚠️ AI 분석 결과를 해석하는 데 실패했습니다.")
+            st.code(ai_raw)  # 디버깅용 (나중에 지워도 됨)
+
             
             st.subheader("📷 글/사진 구성 비중")
             fig_pie, ax_pie = plt.subplots()
@@ -257,12 +305,3 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 블로그 ID를 입력해주세요.")
-
-
-
-
-
-
-
-
-
