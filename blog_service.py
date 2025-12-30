@@ -268,40 +268,41 @@ if analyze_btn and target_id:
         st.divider()
         st.subheader("8️⃣ [🤖 AI 심층 리포트]")
 
-        try:
-            ai_json = json.loads(ai_raw)
-
-            st.markdown("### 🧠 블로그 취향 분석")
-
-            st.markdown("**📌 주요 주제**")
-            for t in ai_json["main_topics"]:
-                st.write(f"- {t}")
-
-            st.markdown("**👤 블로그 페르소나**")
-            st.write(f"- 성향: {ai_json['persona']['tone']}")
-            st.write(f"- 글쓰기 스타일: {ai_json['persona']['writing_style']}")
-
-            interests = ", ".join(ai_json["persona"]["interests"])
-            st.write(f"- 관심사: {interests}")
-
-            st.markdown("**✍️ 3줄 요약**")
-            for s in ai_json["summary"]:
-                st.write(f"- {s}")
-
-        except Exception as e:
-            st.error("⚠️ AI 분석 결과를 해석하는 데 실패했습니다.")
-            st.code(ai_raw)  # 디버깅용 (나중에 지워도 됨)
-
-        st.divider()    
-        st.subheader("📷 글/사진 구성 비중")
-        fig_pie, ax_pie = plt.subplots()
-        ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
-        st.pyplot(fig_pie)
-
+            try:
+                ai_json = json.loads(ai_raw)
     
-    else:
-        if analyze_btn and not target_id:
-            st.warning("분석할 블로그 ID를 입력해주세요.")
+                st.markdown("### 🧠 블로그 취향 분석")
+    
+                st.markdown("**📌 주요 주제**")
+                for t in ai_json["main_topics"]:
+                    st.write(f"- {t}")
+    
+                st.markdown("**👤 블로그 페르소나**")
+                st.write(f"- 성향: {ai_json['persona']['tone']}")
+                st.write(f"- 글쓰기 스타일: {ai_json['persona']['writing_style']}")
+    
+                interests = ", ".join(ai_json["persona"]["interests"])
+                st.write(f"- 관심사: {interests}")
+    
+                st.markdown("**✍️ 3줄 요약**")
+                for s in ai_json["summary"]:
+                    st.write(f"- {s}")
+    
+            except Exception as e:
+                st.error("⚠️ AI 분석 결과를 해석하는 데 실패했습니다.")
+                st.code(ai_raw)  # 디버깅용 (나중에 지워도 됨)
+    
+            st.divider()    
+            st.subheader("📷 글/사진 구성 비중")
+            fig_pie, ax_pie = plt.subplots()
+            ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
+            st.pyplot(fig_pie)
+    
+        
+        else:
+            if analyze_btn and not target_id:
+                st.warning("분석할 블로그 ID를 입력해주세요.")
+
 
 
 
