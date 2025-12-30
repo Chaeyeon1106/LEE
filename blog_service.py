@@ -299,9 +299,10 @@ if analyze_btn and target_id:
         st.pyplot(fig_pie)
 
     
-else:
-    if analyze_btn and not target_id:
-        st.warning("분석할 블로그 ID를 입력해주세요.")
+    else:
+        if analyze_btn and not target_id:
+            st.warning("분석할 블로그 ID를 입력해주세요.")
+
 
 
 
