@@ -43,11 +43,12 @@ def set_korean_font():
 set_korean_font()
 
 # --- 2. AI 모델 설정 ---
+# [중요 수정] st.secrets 안에는 키 값이 아니라 '이름'인 "GEMINI_API_KEY"가 들어가야 (유출방지)
 try:
     if "GEMINI_API_KEY" in st.secrets:
         GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=GEMINI_API_KEY)
-        ai_model = genai.GenerativeModel('models/gemini-pro') # 모델명 확인
+        ai_model = genai.GenerativeModel('models/gemini-flash-latest')
     else:
         st.error("API 키가 Secrets에 설정되지 않았습니다.")
         st.stop()
@@ -294,6 +295,7 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 블로그 ID를 입력해주세요.")
+
 
 
 
