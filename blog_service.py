@@ -293,15 +293,16 @@ if analyze_btn and target_id:
             st.code(ai_raw)  # 디버깅용 (나중에 지워도 됨)
 
             
-            st.subheader("📷 글/사진 구성 비중")
-            fig_pie, ax_pie = plt.subplots()
-            ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()*100], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
-            st.pyplot(fig_pie)
+        st.subheader("📷 글/사진 구성 비중")
+        fig_pie, ax_pie = plt.subplots()
+        ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
+        st.pyplot(fig_pie)
 
     
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 블로그 ID를 입력해주세요.")
+
 
 
 
