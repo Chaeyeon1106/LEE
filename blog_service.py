@@ -229,8 +229,8 @@ if analyze_btn and target_id:
                 best_l = df.loc[df['좋아요'].idxmax()]
                 best_c = df.loc[df['댓글'].idxmax()]
                 
-                st.info(f"5️⃣ **❤️ 공감 1위: ** \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
-                st.success(f"6️⃣ **💬 댓글 1위: ** \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
+                st.info(f"5️⃣ ❤️ 공감 1위:  \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
+                st.success(f"6️⃣ 💬 댓글 1위:  \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
 
             with col2:
                 st.subheader("7️⃣ 최다 사용 단어 TOP 5")
@@ -258,3 +258,4 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 블로그 ID를 입력해주세요.")
+
