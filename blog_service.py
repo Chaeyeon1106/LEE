@@ -4,6 +4,7 @@
 #https://nblog-analyzer-by-chaeyeon.streamlit.app/
 #Streamlit Cloud 대시보드 -> Settings -> Secrets 메뉴에 아래 내용을 정확히 입력하고 저장(Save)
 
+#라이브러리 
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
@@ -41,8 +42,8 @@ def set_korean_font():
 
 set_korean_font()
 
-# --- 2. AI 모델 설정 (보안 적용 완료) ---
-# [중요 수정] st.secrets 안에는 키 값이 아니라 '이름'인 "GEMINI_API_KEY"가 들어가야 합니다.
+# --- 2. AI 모델 설정 ---
+# [중요 수정] st.secrets 안에는 키 값이 아니라 '이름'인 "GEMINI_API_KEY"가 들어가야 (유출방지)
 try:
     if "GEMINI_API_KEY" in st.secrets:
         GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -67,12 +68,12 @@ def enter_frame(driver):
 
 # --- 3. 웹 화면 UI ---
 st.title("이채연의 네이버 블로그 AI 분석기🤖")
-st.write("아이디를 입력하면 당신의 블로그를 모두 긁어와 AI가 리포트를 작성합니다.")
+st.write("아이디를 입력하면 당신의 "전체공개" 블로그 글들을 기반으로 AI가 분석합니다.")
 
 with st.sidebar:
     st.header("⚙️ 설정")
     target_id = st.text_input("네이버 블로그 ID", placeholder="예: chaeyeonlee_1106")
-    analyze_btn = st.button("전체 게시글 분석 시작 🚀")
+    analyze_btn = st.button("게시글 분석 시작 🚀")
     st.info("글 개수가 많으면 분석에 시간이 다소 소요됩니다.")
 
 if analyze_btn and target_id:
@@ -143,7 +144,7 @@ if analyze_btn and target_id:
         total_links = len(all_post_links)
         
         if total_links == 0:
-            st.error("수집된 게시글이 없습니다. 아이디를 확인해주세요.")
+            st.error("수집된 게시글이 없습니다. 아이디나 전체공개 여부를 확인해주세요.")
             st.stop()
 
         for i, url in enumerate(all_post_links):
