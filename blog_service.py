@@ -298,11 +298,10 @@ if analyze_btn and target_id:
             ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()*100], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
             st.pyplot(fig_pie)
 
-    except Exception as e:
-        st.error(f"⚠️ 분석 중 오류 발생: {e}")
     
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 블로그 ID를 입력해주세요.")
+
 
 
