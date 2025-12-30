@@ -4,7 +4,6 @@
 #https://nblog-analyzer-by-chaeyeon.streamlit.app/
 #Streamlit Cloud 대시보드 -> Settings -> Secrets 메뉴에 아래 내용을 정확히 입력하고 저장(Save)
 
-#라이브러리 
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
@@ -12,6 +11,7 @@ import matplotlib.pyplot as plt
 import re
 import time
 import matplotlib.font_manager as fm 
+import json  # json import 위치 수정
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -43,12 +43,11 @@ def set_korean_font():
 set_korean_font()
 
 # --- 2. AI 모델 설정 ---
-# [중요 수정] st.secrets 안에는 키 값이 아니라 '이름'인 "GEMINI_API_KEY"가 들어가야 (유출방지)
 try:
     if "GEMINI_API_KEY" in st.secrets:
         GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=GEMINI_API_KEY)
-        ai_model = genai.GenerativeModel('models/gemini-flash-latest')
+        ai_model = genai.GenerativeModel('models/gemini-pro') # 모델명 확인
     else:
         st.error("API 키가 Secrets에 설정되지 않았습니다.")
         st.stop()
@@ -86,15 +85,11 @@ if analyze_btn and target_id:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        chrome_options.binary_location = "/usr/bin/chromium" 
 
         status_text.text("🔍 서버 브라우저 엔진 설정 중...")
         
-        try:
-            service = Service("/usr/bin/chromedriver")
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-        except:
-            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         
         driver.get(f"https://blog.naver.com/{target_id}")
         time.sleep(2)
@@ -123,22 +118,16 @@ if analyze_btn and target_id:
                     if clean_url not in all_post_links:
                         all_post_links.append(clean_url)
             
-            status_text.text(f"🔗 링크 수집 중: {current_page}페이지 완료 (누적 {len(all_post_links)}개)")
+            if len(all_post_links) >= 30: break # 속도를 위해 30개 제한 (조정 가능)
             
-            next_p = current_page + 1
             try:
+                next_p = current_page + 1
                 page_btn = driver.find_element(By.LINK_TEXT, str(next_p))
                 driver.execute_script("arguments[0].click();", page_btn)
                 time.sleep(1)
                 current_page = next_p
             except:
-                try:
-                    next_btn = driver.find_element(By.CSS_SELECTOR, "a.pg_next")
-                    driver.execute_script("arguments[0].click();", next_btn)
-                    time.sleep(1)
-                    current_page = next_p
-                except:
-                    break 
+                break 
 
         data = []
         total_links = len(all_post_links)
@@ -209,8 +198,6 @@ if analyze_btn and target_id:
 
             status_text.text("🤖 AI가 리포트를 생성하고 있습니다...")
             
-            import json
-
             titles_summary = "\n".join(df['제목'].tolist()[:30])
             
             prompt = f"""
@@ -234,7 +221,6 @@ if analyze_btn and target_id:
             """
             
             ai_raw = ai_model.generate_content(prompt).text
-
 
             st.balloons()
             st.header(f"📊 {target_id} 블로그 최종 분석 리포트")
@@ -265,11 +251,13 @@ if analyze_btn and target_id:
                 ax_bar.bar(w_labels, w_counts, color='#A0C4FF')
                 st.pyplot(fig_bar)
 
-        st.divider()
-        st.subheader("8️⃣ [🤖 AI 심층 리포트]")
+            st.divider()
+            st.subheader("8️⃣ [🤖 AI 심층 리포트]")
 
             try:
-                ai_json = json.loads(ai_raw)
+                # 불필요한 마크다운 코드 블록 제거 후 파싱
+                clean_json = ai_raw.replace('```json', '').replace('```', '').strip()
+                ai_json = json.loads(clean_json)
     
                 st.markdown("### 🧠 블로그 취향 분석")
     
@@ -290,19 +278,22 @@ if analyze_btn and target_id:
     
             except Exception as e:
                 st.error("⚠️ AI 분석 결과를 해석하는 데 실패했습니다.")
-                st.code(ai_raw)  # 디버깅용 (나중에 지워도 됨)
+                st.code(ai_raw) 
     
             st.divider()    
             st.subheader("📷 글/사진 구성 비중")
             fig_pie, ax_pie = plt.subplots()
             ax_pie.pie([df['글자수'].sum(), df['이미지수'].sum()], labels=['글', '사진'], autopct='%1.1f%%', colors=['#BDB2FF', '#FFD6A5'])
             st.pyplot(fig_pie)
-    
-        
-        else:
-            if analyze_btn and not target_id:
-                st.warning("분석할 블로그 ID를 입력해주세요.")
 
+        driver.quit() # 브라우저 종료 추가
+
+    except Exception as e:
+        st.error(f"⚠️ 오류 발생: {e}")
+
+else:
+    if analyze_btn and not target_id:
+        st.warning("분석할 블로그 ID를 입력해주세요.")
 
 
 
