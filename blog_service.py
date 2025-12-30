@@ -207,7 +207,7 @@ if analyze_btn and target_id:
                 else: return "겨울 ❄️"
             df['계절'] = df['month'].apply(get_season)
 
-            status_text.text("🤖 AI가 페르소나 리포트를 최종 생성하고 있습니다...")
+            status_text.text("🤖 AI가 리포트를 생성하고 있습니다...")
             
             titles_summary = "\n".join(df['제목'].tolist()[:30])
             prompt = f"다음 블로그 제목들을 보고 주제, 페르소나 분석, 3줄 요약을 한국어로 작성해줘:\n{titles_summary}"
@@ -228,8 +228,8 @@ if analyze_btn and target_id:
                 best_l = df.loc[df['좋아요'].idxmax()]
                 best_c = df.loc[df['댓글'].idxmax()]
                 
-                st.info(f"5️⃣ **🏆 명예의 전당: 가장 뜨거웠던 포스트** \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
-                st.success(f"6️⃣ **💬 소통왕: 댓글 반응이 가장 좋았던 글** \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
+                st.info(f"5️⃣ **❤️ 공감 1위: ** \n\n **{best_l['제목']}** (❤️ {best_l['좋아요']}개)")
+                st.success(f"6️⃣ **💬 댓글 1위: ** \n\n **{best_c['제목']}** (💬 {best_c['댓글']}개)")
 
             with col2:
                 st.subheader("7️⃣ 최다 사용 단어 TOP 5")
@@ -256,7 +256,8 @@ if analyze_btn and target_id:
     
 else:
     if analyze_btn and not target_id:
-        st.warning("분석할 네이버 ID를 입력해주세요.")
+        st.warning("분석할 블로그 ID를 입력해주세요.")
+
 
 
 
