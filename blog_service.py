@@ -283,7 +283,7 @@ if analyze_btn and target_id:
 
             st.write("- 관심사:")
             for i in ai_json["persona"]["interests"]:
-                st.write(f"  • {i}")
+                #st.write(f"  • {i}")
 
             st.markdown("**✍️ 3줄 요약**")
             for s in ai_json["summary"]:
@@ -305,3 +305,4 @@ if analyze_btn and target_id:
 else:
     if analyze_btn and not target_id:
         st.warning("분석할 블로그 ID를 입력해주세요.")
+
